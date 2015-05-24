@@ -9,8 +9,8 @@
 
 import java.io.*;
 import java.util.*;
+import java.util.regex.*;
 import java.security.*;
-//import net.arnx.jsonic.JSON;
 
 public class User{
 	private String name = null; 
@@ -22,35 +22,26 @@ public class User{
 		this.name = name;
 		return true;
 	}
-
 	boolean setPassword(String password){
 		this.password = password;
 		return true;
 	}
-
 	String getName(){
 		return this.name;
 	}
-
 	String getPassword(){
 		return this.password;
 	}
-
-	//for test
-	/* public static void main(String[] args) {
-		User user = new User();
-		user.setName("Haru");
-		user.setPassword("uni");
-		System.out.println(user.getName()+":"+user.getPassword());
-	} */
 }
 
 class Users{
 	private List<User> users = new ArrayList<User>();
-	//ユーザで使う入力
+
+	//ユーザで使う入出力
 	private BufferedReader in;
-	//ユーザで使う出力
 	private PrintWriter out;
+
+	private String filename = "users.dat";
 
 	//users作成時にユーザで使う入出力を渡す
 	public Users(BufferedReader in, PrintWriter out){
@@ -58,32 +49,73 @@ class Users{
 		this.out = out;
 	}
 
-	//超簡易ユーザ認証用(真偽値) 
-	public boolean authenticate(String name, String password){
+	// ファイルから既存のユーザデータを読み込む
+	public boolean readUserData(){
+		try {
+			BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(filename), "UTF-8"));
+			String line;
 
-		for(User user : users){
-			if(user.getName().equals(name)){
-				if(user.getPassword().equals(hash(password))){
-					out.println("ユーザ認証に成功しました");
-					out.flush();
-					return true;
-				}else{
-					out.println("パスワードが間違っています");
-					out.flush();
-					return false;
+			while ((line = br.readLine()) != null) {
+				String text[] = line.split(",", 2);
+				User user = new User();
+				user.setName(text[0]);
+				user.setPassword(text[1]);
+				users.add(user);
+			}
+			br.close();
+
+		} catch(Exception e) {
+			System.err.println(e);
+		}
+		return true;
+	}
+
+	// ユーザ認証 
+	public boolean authenticate() {
+
+		out.println("=========================");
+		out.println("■ ログインします。ログイン情報を入力してください。");
+		out.println("=========================");
+		out.flush();
+
+		try {
+			out.print("name : ");
+			out.flush();
+			String name = in.readLine();
+
+			out.print("password : ");
+			out.flush();
+			String password = hash(in.readLine());
+
+			for(User user : users){
+				if(user.getName().equals(name)){
+					if(user.getPassword().equals(password)){
+						out.println("ユーザ認証に成功しました");
+						out.flush();
+						return true;
+					}else{
+						out.println("パスワードが間違っています");
+						out.flush();
+						return false;
+					}
 				}
 			}
+			out.println("ユーザ名が間違っています");
+			out.flush();
+			return false;
+
+		} catch(IOException e) {
+			e.printStackTrace();
+			return false;
 		}
-		out.println("ユーザ名が間違っています");
-		out.flush();
-		return false;
 	}
 
 	//超簡易ユーザ認証(User)
+	//引数passwordは、ハッシュ化済みのものが渡されることを想定している
 	public User getUser(String name, String password){
 		for(User user : users){
 			if(user.getName().equals(name)){
-				if(user.getPassword().equals(hash(password))){
+				if(user.getPassword().equals(password)){
 					return user;
 				}else{
 					return null;
@@ -96,30 +128,54 @@ class Users{
 	public boolean createUser(){
 		User user = new User();
 
-		out.print("アカウントを作成します。\n");
+		out.println("=========================");
+		out.println("■ アカウントを作成します。");
+		out.println("=========================");
 		out.flush();
 
 		try{
+			String name, password;
+			boolean flag1 = false, flag2 = true;
+
+			//ユーザ名が半角英数+下線のみで構成されているか調べるための正規表現
+			Pattern p = Pattern.compile("^[a-zA-Z0-9_]+$");
+
 			//nameを登録
 			while(true){
 				out.print("name : ");
 				out.flush();
-				String name = in.readLine();
-				if(user.setName(name)){
-					break;
+				name = in.readLine();
+				flag1 = p.matcher(name).find();
+
+				for(User u : users)
+					if(u.getName().equals(name)) flag2 = false;
+
+				if(!flag1) {
+					out.println("ユーザ名に使えるのは、半角英数字と下線のみです。");
+					out.flush();
+				} else if(!flag2) {
+					out.println("そのユーザ名は既に使われています。");
+					out.flush();
+				} else {
+					if(user.setName(name)) break;
 				}
 			}
 			//passwordを登録
+			//パスワードはどうせハッシュ化するので、どんな文字を使っても可
 			while(true){
 				out.print("password : ");
 				out.flush();
-				String password = in.readLine();
-				if(user.setPassword(hash(password))){
-					break;
-				}
+				password = hash(in.readLine());
+				if(user.setPassword(password)) break;
 			}
 			//userを追加
 			users.add(user);
+
+			//ユーザ情報を格納するファイルにも追加
+			PrintWriter pw = new PrintWriter(new FileWriter(filename, true));
+			pw.println(name + "," + password);
+			pw.close();
+
 		}catch(IOException error){
 			error.printStackTrace();
 		}
@@ -127,6 +183,12 @@ class Users{
 	}
 
 	public boolean deleteUser(){
+
+		out.println("=========================");
+		out.println("■ アカウントを削除します。");
+		out.println("=========================");
+		out.flush();
+
 		try{
 			out.print("Name : ");
 			out.flush();
@@ -134,15 +196,23 @@ class Users{
 			
 			out.print("password : ");
 			out.flush();
-			String password = in.readLine();
+			String password = hash(in.readLine());
 
 			User user = this.getUser(name, password);
 			if(user!=null){
 				this.users.remove(user);
+				(new File(filename)).delete();
+
+				PrintWriter pw = new PrintWriter(new FileWriter(filename, true));
+				for(User u : users)
+					pw.println(u.getName() + "," + u.getPassword());
+				pw.close();
+
 				out.println("ユーザを消去しました");
 				out.flush();
 			}else{
 				out.println("ユーザ認証に失敗しました");
+				out.flush();
 			}
 		}catch(IOException error){
 			error.printStackTrace();
@@ -150,48 +220,35 @@ class Users{
 		return true;
 	}
 
-	public String hash(String passwd){
+	// パスワードをハッシュ化する関数
+	public String hash(String password){
 		String digest = "";
 		try {
-			// 頑張ってハッシュ化する。（コピペ）
 			MessageDigest md = MessageDigest.getInstance("SHA-512");
-			md.update(passwd.getBytes());
+			md.update(password.getBytes());
 			byte[] hash = md.digest();
+
 			StringBuilder sb = new StringBuilder();
-			for (byte b : hash)
-				sb.append(String.format("%02x", b));
-			digest =  sb.toString();
+			for(byte b : hash) sb.append(String.format("%02x", b));
+			digest = sb.toString();
+
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		}
 		return digest;
 	}
 
-	//for test
 	public static void main(String[] args) throws ClassNotFoundException {
 
 		BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
 		PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out)));
 		
 		Users users = new Users(in, out);
-		/* JSON
-		FileInputStream fin = new FileInputStream("userdb.json");
-		InputStreamReader isr = new InputStreamReader(fin, "UTF-8");
-		BufferedReader br = new BufferedReader(isr);
-		String text = "", line;
-		while ((line = br.readLine()) != null) {
-			text += line;
-		}
-		users = (List)JSON.decode(text);
-		*/
 
-		users.createUser();
-		System.out.println(users.authenticate("Haru","Uni"));
-		System.out.println(users.authenticate("Haru","uni"));
-		System.out.println(users.authenticate("haru","uni"));
+		users.readUserData();
+		users.authenticate();
+
 		users.deleteUser();
-		System.out.println(users.authenticate("Haru","Uni"));
-
 	}
 }
 

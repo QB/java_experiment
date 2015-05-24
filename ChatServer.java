@@ -51,7 +51,7 @@ public class ChatServer{
 				System.out.println(serversocket);
 				Socket socket = serversocket.accept();
 				System.out.println("test2");
-				System.out.println("-----------新しい接続を受け付けました---------------");//for debug
+				System.out.println("-----------新しい接続を受け付けました---------------");
 				addConnections(socket);
 				(new Thread(new Client(socket))).start();
 			}catch(IOException error){
@@ -79,44 +79,61 @@ class Client implements Runnable{
 	}
 
 	public void run(){
+		System.out.println("新しいスレッドが走り始めました : "+this.name);//for debug
+		Users users = new Users(in, out);
+		users.readUserData();
+		boolean bigFlag = true;
+
 		try{
-			System.out.println("新しいスレッドが走り始めました : "+this.name);//for debug
-			Users users = new Users(in, out);
-
-			// とりあえず今はデータベースに対応していないので、毎回ユーザを新規作成する。
-			// とりあえず、ここでアカウント作成しないと、ログインするアカウントが無い。
-			users.createUser();
-
-			// ここで認証をかける.
-			// 入力が空なら認証失敗するので、入力がnullかチェックする部分は削りました(´・ω・`)
-			while(!flag) {
-				out.println("ログインします。ログイン情報を入力してください。");
+			while (bigFlag) {
+				// メニュー画面
+				out.println("■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■");
+				out.println("1: アカウントを新規作成する");
+				out.println("2: 既存のアカウントでログインする");
+				out.println("3: アカウントを削除する");
+				out.println("4: 終了する");
+				out.print(">> ");
 				out.flush();
+				int selection = Integer.parseInt(in.readLine());
 
-				out.print("What's your name? : ");
-				out.flush();
-				name = in.readLine();
+				switch(selection) {
+				case 1:
+					users.createUser();
+					break;
+				case 2:
+					while(!flag) flag = users.authenticate();
 
-				out.print("What's your passwd? : ");
-				out.flush();
-				passwd = in.readLine();
+					out.println("ようこそ！\n終了したくなったときは、quitと打ってください。");
+					out.println("いつでもメニュー画面に戻ることができます。");
 
-				flag = users.authenticate(name, passwd);
-			}
+					out.print("Input message : ");
+					out.flush();
+					String line = in.readLine();
+					while(!"quit".equals(line)){
+						System.out.println(socket.toString()+": のClientが動いています");
+						ChatServer.sendAll(name + " : " + line);
+						out.print("Input message : ");
+						out.flush();
+						line = in.readLine();
+					}
+					break;
+				case 3:
+					users.deleteUser();
+					break;
+				case 4:
+					bigFlag = false;
+					out.println("じゃあね～");
+					out.flush();
+					break;
+				default:
+					out.println("選択肢の数字を入力してください。");
+					out.flush();
+				}
 
-			//System.out.println("名前が設定されました : "+this.name);//for debug
-			out.print("Input message : ");
-			out.flush();
-			String line = in.readLine();
-			while(!"quit".equals(line)){
-				System.out.println(socket.toString()+": のClientが動いています");
-				ChatServer.sendAll(name + " : " + line);
-				out.print("Input message : ");
-				out.flush();
-				line = in.readLine();
-			}
+			} // end while
 			ChatServer.deleteConnection(socket);
 			socket.close();
+
 		}catch(IOException error){
 			try{
 				socket.close();
