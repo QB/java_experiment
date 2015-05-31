@@ -70,8 +70,8 @@ class Users{
 		return true;
 	}
 
-	// ユーザ認証 
-	public boolean authenticate() {
+	// ユーザ認証 (名前を返す)
+	public String authenticate() {
 
 		out.println("=========================");
 		out.println("■ ログインします。ログイン情報を入力してください。");
@@ -92,21 +92,21 @@ class Users{
 					if(user.getPassword().equals(password)){
 						out.println("ユーザ認証に成功しました");
 						out.flush();
-						return true;
+						return name;
 					}else{
 						out.println("パスワードが間違っています");
 						out.flush();
-						return false;
+						return "";
 					}
 				}
 			}
 			out.println("ユーザ名が間違っています");
 			out.flush();
-			return false;
+			return "";
 
 		} catch(IOException e) {
 			e.printStackTrace();
-			return false;
+			return "";
 		}
 	}
 

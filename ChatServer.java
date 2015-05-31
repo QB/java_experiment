@@ -69,7 +69,8 @@ class Client implements Runnable{
 	String name = null, passwd = null;
 	ChatServer server = null;
 	int num;
-	boolean flag = false;
+	boolean flag = true;
+	String userName = "";
 
 	public Client(Socket socket) throws IOException{ 
 		System.out.println("新しいClientからの接続 : " + this.name);//for debug
@@ -80,12 +81,17 @@ class Client implements Runnable{
 
 	public void run(){
 		System.out.println("新しいスレッドが走り始めました : "+this.name);//for debug
+		Rooms rooms = new Rooms(in, out);
 		Users users = new Users(in, out);
 		users.readUserData();
-		boolean bigFlag = true;
+
+		// for debug
+		rooms.createRoom("ROOM1");
+		rooms.createRoom("ROOM2");
+		rooms.createRoom("ROOM3");
 
 		try{
-			while (bigFlag) {
+			while (flag) {
 				// メニュー画面
 				out.println("■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■");
 				out.println("1: アカウントを新規作成する");
@@ -101,28 +107,39 @@ class Client implements Runnable{
 					users.createUser();
 					break;
 				case 2:
-					while(!flag) flag = users.authenticate();
+					while(userName=="") userName = users.authenticate();
 
-					out.println("ようこそ！\n終了したくなったときは、quitと打ってください。");
-					out.println("いつでもメニュー画面に戻ることができます。");
+					out.println("現在、チャット場には、次の部屋が作られています。");
+					out.println("部屋での会話を終了したくなったときは、quitと打ってください。");
 
-					out.print("Input message : ");
-					out.flush();
-					String line = in.readLine();
-					while(!"quit".equals(line)){
-						System.out.println(socket.toString()+": のClientが動いています");
-						ChatServer.sendAll(name + " : " + line);
-						out.print("Input message : ");
+					List<Room> roomList = rooms.getRooms();
+					int n = roomList.size(); // 現在の部屋の数
+
+					// 部屋の一覧を出力
+					for (int i=0; i<n; i++)
+						out.println(i + ": " + roomList.get(i).getName());
+					out.println(n + ": [新規作成]");
+
+					// どの部屋に入るか選択させる
+					selection = -1;
+					while(true) {
+						out.print(">> ");
 						out.flush();
-						line = in.readLine();
+						selection = Integer.parseInt(in.readLine());
+						if(selection <= n && selection >= 0) break;
+						else out.println("正しい部屋番号を入力してください。");
 					}
+					roomList.get(selection).talk(in, out, userName, socket);
+
+					out.print("Roomクラスへ飛ぶ");
+
 					break;
 				case 3:
 					users.deleteUser();
 					break;
 				case 4:
-					bigFlag = false;
-					out.println("じゃあね～");
+					flag = false;
+					out.println("終了します。");
 					out.flush();
 					break;
 				default:
